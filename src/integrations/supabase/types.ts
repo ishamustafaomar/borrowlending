@@ -14,7 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      borrows: {
+        Row: {
+          borrower_id: string
+          created_at: string
+          dates: string
+          id: string
+          item_id: string
+          message: string
+          status: Database["public"]["Enums"]["borrow_status"]
+        }
+        Insert: {
+          borrower_id: string
+          created_at?: string
+          dates?: string
+          id?: string
+          item_id: string
+          message?: string
+          status?: Database["public"]["Enums"]["borrow_status"]
+        }
+        Update: {
+          borrower_id?: string
+          created_at?: string
+          dates?: string
+          id?: string
+          item_id?: string
+          message?: string
+          status?: Database["public"]["Enums"]["borrow_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "borrows_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      items: {
+        Row: {
+          availability: string
+          availability_tags: string[]
+          category: string
+          created_at: string
+          distance_mi: number
+          doors_away: string
+          emoji: string
+          estimated_value: number
+          id: string
+          name: string
+          owner_avatar_color: string
+          owner_display_name: string
+          owner_id: string | null
+          synonyms: string[]
+        }
+        Insert: {
+          availability?: string
+          availability_tags?: string[]
+          category?: string
+          created_at?: string
+          distance_mi?: number
+          doors_away?: string
+          emoji?: string
+          estimated_value?: number
+          id?: string
+          name: string
+          owner_avatar_color?: string
+          owner_display_name: string
+          owner_id?: string | null
+          synonyms?: string[]
+        }
+        Update: {
+          availability?: string
+          availability_tags?: string[]
+          category?: string
+          created_at?: string
+          distance_mi?: number
+          doors_away?: string
+          emoji?: string
+          estimated_value?: number
+          id?: string
+          name?: string
+          owner_avatar_color?: string
+          owner_display_name?: string
+          owner_id?: string | null
+          synonyms?: string[]
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_color: string
+          created_at: string
+          display_name: string
+          distance_mi: number
+          doors_away: string
+          id: string
+        }
+        Insert: {
+          avatar_color?: string
+          created_at?: string
+          display_name: string
+          distance_mi?: number
+          doors_away?: string
+          id: string
+        }
+        Update: {
+          avatar_color?: string
+          created_at?: string
+          display_name?: string
+          distance_mi?: number
+          doors_away?: string
+          id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -23,7 +138,7 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      borrow_status: "pending" | "approved" | "declined" | "completed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +265,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      borrow_status: ["pending", "approved", "declined", "completed"],
+    },
   },
 } as const
