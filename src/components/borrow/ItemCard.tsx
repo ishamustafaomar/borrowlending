@@ -9,10 +9,8 @@ export function ItemCard({
   item: Item;
   onAsk: (item: Item) => void;
 }) {
-  const distanceLabel =
-    item.distanceMi < 0.1
-      ? `${Math.round(item.distanceMi * 5280)} ft`
-      : `${item.distanceMi.toFixed(1)} mi`;
+  const d = Number(item.distance_mi);
+  const distanceLabel = d < 0.1 ? `${Math.round(d * 5280)} ft` : `${d.toFixed(1)} mi`;
 
   return (
     <article className="group flex flex-col gap-4 rounded-3xl border border-border bg-card p-5 shadow-[var(--shadow-card)] transition-all hover:-translate-y-0.5 hover:shadow-[var(--shadow-soft)]">
@@ -30,13 +28,13 @@ export function ItemCard({
           <div className="mt-1.5 flex items-center gap-2">
             <span
               className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-primary-foreground"
-              style={{ background: item.owner.avatarColor }}
+              style={{ background: item.owner_avatar_color }}
               aria-hidden
             >
-              {item.owner.name[0]}
+              {item.owner_display_name[0]?.toUpperCase()}
             </span>
             <span className="text-sm font-medium text-foreground">
-              {item.owner.name}
+              {item.owner_display_name}
             </span>
           </div>
         </div>
@@ -48,7 +46,7 @@ export function ItemCard({
           <span>
             <span className="font-semibold text-foreground">{distanceLabel}</span>
             <span className="mx-1">·</span>
-            <span>{item.doorsAway}</span>
+            <span>{item.doors_away}</span>
           </span>
         </div>
         <div className="flex items-center gap-1.5 justify-end text-muted-foreground">
