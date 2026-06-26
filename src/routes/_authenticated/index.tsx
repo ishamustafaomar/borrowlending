@@ -45,7 +45,10 @@ function Home() {
   }, [search, items, itemsById]);
 
   const summary =
-    search?.summary ?? `${items.length} things your block is happy to lend right now.`;
+    search?.summary ??
+    (items.length === 0
+      ? "Nothing on the block yet — be the first to lend something."
+      : `${items.length} thing${items.length === 1 ? "" : "s"} your block is happy to lend right now.`);
 
   return (
     <div className="min-h-screen bg-background">
@@ -67,12 +70,30 @@ function Home() {
         </div>
 
         <section aria-label="Available items">
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            {ranked.map((it) => (
-              <ItemCard key={it.id} item={it} onAsk={setAskItem} />
-            ))}
-          </div>
+          {ranked.length === 0 ? (
+            <div className="rounded-3xl border border-dashed border-border bg-card/60 p-8 text-center">
+              <p className="font-display text-xl font-bold text-primary">
+                Your block is empty — for now.
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Lend the first thing and neighbors can borrow it instantly.
+              </p>
+              <button
+                onClick={() => setLendOpen(true)}
+                className="mt-4 rounded-full bg-coral px-5 py-2 text-sm font-semibold text-coral-foreground hover:bg-coral/90"
+              >
+                + Lend something
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {ranked.map((it) => (
+                <ItemCard key={it.id} item={it} onAsk={setAskItem} />
+              ))}
+            </div>
+          )}
         </section>
+
 
         <MyBorrowsList />
 
