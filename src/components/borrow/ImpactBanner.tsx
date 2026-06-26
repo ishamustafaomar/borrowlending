@@ -4,7 +4,7 @@ import { Leaf } from "lucide-react";
 
 export function ImpactBanner() {
   const { data } = useImpact();
-  const impact = data ?? { itemsShared: 47, dollarsSaved: 3240, thingsNotBought: 31 };
+  const impact = data ?? { itemsShared: 0, dollarsSaved: 0, thingsNotBought: 0 };
   const items = useCountUp(impact.itemsShared);
   const saved = useCountUp(impact.dollarsSaved);
   const not = useCountUp(impact.thingsNotBought);

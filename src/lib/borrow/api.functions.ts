@@ -118,22 +118,24 @@ export const approveBorrow = createServerFn({ method: "POST" })
 export const getImpact = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const baseShared = 47;
-    const baseSaved = 3240;
-    const baseNotBought = 31;
-
     const { data: borrows } = await context.supabase
       .from("borrows")
       .select("item:items(estimated_value)");
     const rows = (borrows ?? []) as Array<{ item: { estimated_value: number } | null }>;
-    const extraSaved = rows.reduce((s, r) => s + Number(r.item?.estimated_value ?? 0), 0);
+    const dollarsSaved = rows.reduce((s, r) => s + Number(r.item?.estimated_value ?? 0), 0);
     const count = rows.length;
+
+    const { count: itemCount } = await context.supabase
+      .from("items")
+      .select("id", { count: "exact", head: true });
+
     return {
-      itemsShared: baseShared + count,
-      dollarsSaved: baseSaved + extraSaved,
-      thingsNotBought: baseNotBought + count,
+      itemsShared: itemCount ?? 0,
+      dollarsSaved,
+      thingsNotBought: count,
     };
   });
+
 
 // ---------- Smart search (AI + rule-based fallback) ----------
 
@@ -154,11 +156,24 @@ export const smartSearch = createServerFn({ method: "POST" })
     if (!query) {
       return {
         itemIds: items.map((i) => i.id),
-        summary: `${items.length} things your block is happy to lend right now.`,
+        summary:
+          items.length === 0
+            ? "Nothing on the block yet — be the first to lend something."
+            : `${items.length} thing${items.length === 1 ? "" : "s"} your block is happy to lend right now.`,
         whenLabel: null,
         isFallback: false,
       };
     }
+
+    if (items.length === 0) {
+      return {
+        itemIds: [],
+        summary: "Your block doesn't have anything listed yet. Lend something to get it started.",
+        whenLabel: null,
+        isFallback: true,
+      };
+    }
+
 
     // Try AI first
     try {
