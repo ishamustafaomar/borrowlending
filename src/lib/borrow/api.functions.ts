@@ -118,22 +118,24 @@ export const approveBorrow = createServerFn({ method: "POST" })
 export const getImpact = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const baseShared = 47;
-    const baseSaved = 3240;
-    const baseNotBought = 31;
-
     const { data: borrows } = await context.supabase
       .from("borrows")
       .select("item:items(estimated_value)");
     const rows = (borrows ?? []) as Array<{ item: { estimated_value: number } | null }>;
-    const extraSaved = rows.reduce((s, r) => s + Number(r.item?.estimated_value ?? 0), 0);
+    const dollarsSaved = rows.reduce((s, r) => s + Number(r.item?.estimated_value ?? 0), 0);
     const count = rows.length;
+
+    const { count: itemCount } = await context.supabase
+      .from("items")
+      .select("id", { count: "exact", head: true });
+
     return {
-      itemsShared: baseShared + count,
-      dollarsSaved: baseSaved + extraSaved,
-      thingsNotBought: baseNotBought + count,
+      itemsShared: itemCount ?? 0,
+      dollarsSaved,
+      thingsNotBought: count,
     };
   });
+
 
 // ---------- Smart search (AI + rule-based fallback) ----------
 
