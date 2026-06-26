@@ -156,11 +156,24 @@ export const smartSearch = createServerFn({ method: "POST" })
     if (!query) {
       return {
         itemIds: items.map((i) => i.id),
-        summary: `${items.length} things your block is happy to lend right now.`,
+        summary:
+          items.length === 0
+            ? "Nothing on the block yet — be the first to lend something."
+            : `${items.length} thing${items.length === 1 ? "" : "s"} your block is happy to lend right now.`,
         whenLabel: null,
         isFallback: false,
       };
     }
+
+    if (items.length === 0) {
+      return {
+        itemIds: [],
+        summary: "Your block doesn't have anything listed yet. Lend something to get it started.",
+        whenLabel: null,
+        isFallback: true,
+      };
+    }
+
 
     // Try AI first
     try {
