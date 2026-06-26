@@ -1,25 +1,33 @@
 export type Item = {
   id: string;
+  owner_id: string | null;
+  owner_display_name: string;
+  owner_avatar_color: string;
+  distance_mi: number;
+  doors_away: string;
   name: string;
   emoji: string;
   category: string;
-  owner: { name: string; avatarColor: string };
-  distanceMi: number;
-  doorsAway: string;
-  availability: string;
-  availabilityTags: string[];
-  estimatedValue: number;
   synonyms: string[];
+  availability: string;
+  availability_tags: string[];
+  estimated_value: number;
 };
 
-export type BorrowRequest = {
+export type BorrowRow = {
   id: string;
-  itemId: string;
-  itemName: string;
-  itemEmoji: string;
-  ownerName: string;
+  item_id: string;
+  borrower_id: string;
   dates: string;
   message: string;
-  status: "Pending" | "Approved";
-  createdAt: number;
+  status: "pending" | "approved" | "declined" | "completed";
+  created_at: string;
+  item?: Pick<Item, "id" | "name" | "emoji" | "owner_display_name"> | null;
+};
+
+export type SearchResult = {
+  itemIds: string[];
+  summary: string;
+  whenLabel: string | null;
+  isFallback: boolean;
 };

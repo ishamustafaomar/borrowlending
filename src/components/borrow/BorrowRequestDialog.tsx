@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useEffect, useState } from "react";
 import type { Item } from "@/lib/borrow/types";
-import { useBorrow } from "@/lib/borrow/store";
+import { useRequestBorrow } from "@/lib/borrow/hooks";
 import { toast } from "sonner";
 
 export function BorrowRequestDialog({
@@ -26,32 +26,33 @@ export function BorrowRequestDialog({
   open: boolean;
   onOpenChange: (v: boolean) => void;
 }) {
-  const { requestBorrow } = useBorrow();
+  const mutation = useRequestBorrow();
   const [dates, setDates] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (open && item) {
-      setDates(defaultWhen ? capitalize(defaultWhen) : "This weekend");
+      setDates(defaultWhen ? cap(defaultWhen) : "This weekend");
       setMessage("");
     }
   }, [open, item, defaultWhen]);
 
   if (!item) return null;
 
-  const submit = () => {
-    requestBorrow({
-      itemId: item.id,
-      itemName: item.name,
-      itemEmoji: item.emoji,
-      ownerName: item.owner.name,
-      dates: dates || "Flexible",
-      message,
-    });
-    toast.success(`Request sent to ${item.owner.name}!`, {
-      description: `${item.owner.name} usually replies within an hour.`,
-    });
-    onOpenChange(false);
+  const submit = async () => {
+    try {
+      await mutation.mutateAsync({
+        itemId: item.id,
+        dates: dates || "Flexible",
+        message,
+      });
+      toast.success(`Request sent to ${item.owner_display_name}!`, {
+        description: `${item.owner_display_name} usually replies within an hour.`,
+      });
+      onOpenChange(false);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
   };
 
   return (
@@ -64,10 +65,10 @@ export function BorrowRequestDialog({
             </div>
             <div>
               <DialogTitle className="font-display text-2xl font-bold">
-                Ask {item.owner.name}
+                Ask {item.owner_display_name}
               </DialogTitle>
               <DialogDescription>
-                for their {item.name.toLowerCase()} · {item.doorsAway.toLowerCase()}
+                for their {item.name.toLowerCase()} · {item.doors_away.toLowerCase()}
               </DialogDescription>
             </div>
           </div>
@@ -97,18 +98,15 @@ export function BorrowRequestDialog({
         </div>
 
         <DialogFooter className="gap-2 sm:gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => onOpenChange(false)}
-            className="rounded-full"
-          >
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="rounded-full">
             Cancel
           </Button>
           <Button
             onClick={submit}
+            disabled={mutation.isPending}
             className="rounded-full bg-coral text-coral-foreground hover:bg-coral/90 font-semibold"
           >
-            Send request
+            {mutation.isPending ? "Sending…" : "Send request"}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -116,6 +114,6 @@ export function BorrowRequestDialog({
   );
 }
 
-function capitalize(s: string) {
+function cap(s: string) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
