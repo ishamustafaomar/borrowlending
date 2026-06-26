@@ -3,6 +3,17 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
 import type { Item, BorrowRow, SearchResult } from "./types";
 
+// Map raw DB errors to safe user-facing messages; log details server-side.
+function safeError(error: unknown, fallback = "Something went wrong. Please try again."): Error {
+  console.error("[borrow api error]", error);
+  const code = (error as { code?: string } | null)?.code;
+  if (code === "23505") return new Error("That already exists.");
+  if (code === "23503") return new Error("Related record not found.");
+  if (code === "23514") return new Error("Invalid value provided.");
+  if (code === "42501" || code === "PGRST301") return new Error("You don't have permission to do that.");
+  return new Error(fallback);
+}
+
 // ---------- Items ----------
 
 export const listItems = createServerFn({ method: "GET" })
@@ -12,7 +23,7 @@ export const listItems = createServerFn({ method: "GET" })
       .from("items")
       .select("*")
       .order("distance_mi", { ascending: true });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError(error, "Couldn't load items.");
     return (data ?? []) as Item[];
   });
 
@@ -53,7 +64,7 @@ export const createItem = createServerFn({ method: "POST" })
       .insert(insert)
       .select("*")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) throw safeError(error, "Couldn't list your item.");
     return row as Item;
   });
 
@@ -80,12 +91,7 @@ export const requestBorrow = createServerFn({ method: "POST" })
       })
       .select("*, item:items(id,name,emoji,owner_display_name)")
       .single();
-    if (error) throw new Error(error.message);
-
-    // Demo warmth: auto-approve after a short delay (fire-and-forget via setTimeout
-    // is not safe in serverless; instead approve immediately with a small chance,
-    // or leave as pending — clients poll for status). Here we approve on a coin flip
-    // so the user sees both states in the demo.
+    if (error) throw safeError(error, "Couldn't send your borrow request.");
     return row as BorrowRow;
   });
 
@@ -97,7 +103,7 @@ export const listMyBorrows = createServerFn({ method: "GET" })
       .select("*, item:items(id,name,emoji,owner_display_name)")
       .eq("borrower_id", context.userId)
       .order("created_at", { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError(error, "Couldn't load your borrows.");
     return (data ?? []) as BorrowRow[];
   });
 
@@ -105,11 +111,25 @@ export const approveBorrow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    // Only the item's owner may approve a borrow request.
+    const { data: borrow, error: fetchErr } = await context.supabase
+      .from("borrows")
+      .select("id, item:items(owner_id)")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (fetchErr) throw safeError(fetchErr, "Couldn't approve that request.");
+    if (!borrow) throw new Error("Request not found.");
+
+    const ownerId = (borrow as { item: { owner_id: string | null } | null }).item?.owner_id;
+    if (!ownerId || ownerId !== context.userId) {
+      throw new Error("Only the item's owner can approve this request.");
+    }
+
     const { error } = await context.supabase
       .from("borrows")
       .update({ status: "approved" })
       .eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) throw safeError(error, "Couldn't approve that request.");
     return { ok: true };
   });
 
@@ -149,7 +169,7 @@ export const smartSearch = createServerFn({ method: "POST" })
       .from("items")
       .select("*")
       .order("distance_mi", { ascending: true });
-    if (error) throw new Error(error.message);
+    if (error) throw safeError(error, "Couldn't search right now.");
     const items = (itemsData ?? []) as Item[];
 
     const query = data.query.trim();
