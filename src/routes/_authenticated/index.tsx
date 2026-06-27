@@ -8,6 +8,7 @@ import { ItemCard } from "@/components/borrow/ItemCard";
 import { BorrowRequestDialog } from "@/components/borrow/BorrowRequestDialog";
 import { LendItemSheet } from "@/components/borrow/LendItemSheet";
 import { MyBorrowsList } from "@/components/borrow/MyBorrowsList";
+import { SeasonalMascot } from "@/components/borrow/SeasonalMascot";
 import type { Item } from "@/lib/borrow/types";
 import { Sparkles, Loader2, Lightbulb } from "lucide-react";
 
