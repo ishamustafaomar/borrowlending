@@ -2,11 +2,13 @@
 // Everything lives in localStorage — no auth, no cloud.
 
 import type { Item, BorrowRow, SearchResult, ImpactStats, TrustCircle } from "./types";
+import { buildMockItems } from "./seed-mock";
 
 const KEYS = {
   profile: "borrow:profile",
   items: "borrow:items",
   borrows: "borrow:borrows",
+  seeded: "borrow:seeded-v2",
 };
 
 export type Profile = {
@@ -63,7 +65,19 @@ export function pickAvatarColor(seed: string): string {
 
 // ---------- Items ----------
 
+function ensureSeeded() {
+  if (!isBrowser()) return;
+  if (localStorage.getItem(KEYS.seeded) === "1") return;
+  const existing = read<Item[]>(KEYS.items, []);
+  // Merge: keep any user-added items, drop stale seed rows, then re-seed.
+  const userItems = existing.filter((i) => !i.id.startsWith("seed-"));
+  const merged = [...buildMockItems(), ...userItems];
+  localStorage.setItem(KEYS.items, JSON.stringify(merged));
+  localStorage.setItem(KEYS.seeded, "1");
+}
+
 export function listItemsLocal(): Item[] {
+  ensureSeeded();
   const items = read<Item[]>(KEYS.items, []);
   return [...items].sort((a, b) => a.distance_mi - b.distance_mi);
 }
@@ -342,6 +356,7 @@ export function resetAllLocal() {
   if (!isBrowser()) return;
   localStorage.removeItem(KEYS.items);
   localStorage.removeItem(KEYS.borrows);
+  localStorage.removeItem(KEYS.seeded);
   window.dispatchEvent(new CustomEvent("borrow:store-change", { detail: { key: "all" } }));
 }
 
