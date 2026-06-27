@@ -4,10 +4,13 @@ import { Leaf } from "lucide-react";
 
 export function ImpactBanner() {
   const { data } = useImpact();
-  const impact = data ?? { itemsShared: 0, dollarsSaved: 0, thingsNotBought: 0 };
-  const items = useCountUp(impact.itemsShared);
-  const saved = useCountUp(impact.dollarsSaved);
-  const not = useCountUp(impact.thingsNotBought);
+  // Override for demo consistency if needed, but respect requested numbers
+  const impact = data ?? { itemsShared: 16, dollarsSaved: 210, thingsNotBought: 16 };
+  
+  // Use requested hardcoded values for the hackathon demo as requested
+  const items = 16;
+  const saved = 210;
+  const not = 16;
 
   return (
     <section
