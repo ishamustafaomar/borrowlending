@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type JSX } from "react";
 
 /**
- * Seasonal mascot — a pixel-art coral crab that adapts to the time of year.
- * Pure inline SVG (crisp-edges) + CSS keyframes. No external assets.
+ * Seasonal mascot — a pixel-art coral crab in the style of the Claude Code
+ * sprite. Pure inline SVG with crisp pixel rendering. Each accessory is
+ * also a hand-pixeled sprite so the whole mascot stays on-style.
  */
 
 type Season =
@@ -50,61 +51,125 @@ function detectSeason(date: Date): SeasonInfo {
   return { key: "default", label: "Today", caption: "Borrow, don't buy." };
 }
 
-/* ---------- Pixel art primitives ----------
-   Each crab is drawn on a 16-wide pixel grid. We compose with <rect>
-   pixels so it stays crisp at any size via shape-rendering: crispEdges.
-*/
+/* ---------- Pixel-art helpers ---------- */
 
-type Pixel = [number, number, string]; // x, y, color
+function PixelSprite({
+  rows,
+  palette,
+  className,
+  style,
+}: {
+  rows: string[];
+  palette: Record<string, string>;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const w = rows[0]?.length ?? 0;
+  const h = rows.length;
+  const cells: JSX.Element[] = [];
+  rows.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      const fill = palette[ch];
+      if (fill) cells.push(<rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />);
+    });
+  });
+  return (
+    <svg
+      viewBox={`0 0 ${w} ${h}`}
+      className={className}
+      style={{ shapeRendering: "crispEdges", imageRendering: "pixelated", ...style }}
+      aria-hidden
+    >
+      {cells}
+    </svg>
+  );
+}
 
-// Coral primary, shadow, white highlight, black
-const C = {
-  shell: "#ff7a59",
-  shellDark: "#e0593a",
-  shellHi: "#ffb39a",
-  eye: "#1a1a1a",
-  eyeWhite: "#ffffff",
-  mouth: "#1a1a1a",
+/* ---------- Crab ---------- */
+
+const CRAB_PALETTE = {
+  "#": "#7a2914",   // outline
+  o: "#ff7a59",     // coral fill
+  h: "#ffc9b3",     // highlight
+  s: "#d44a2a",     // shadow
+  w: "#ffffff",     // eye white
+  k: "#1a1a1a",     // pupil / mouth
+  c: "#ff8f72",     // claw mid
 };
 
-// 16x12 pixel crab body (rows: y=0 top)
-const CRAB_PIXELS: Pixel[] = (() => {
-  const p: Pixel[] = [];
-  // claws (left & right, raised)
-  const claws = [
-    [1, 5], [2, 5], [1, 6], [2, 6], [2, 4],
-    [13, 5], [14, 5], [13, 6], [14, 6], [13, 4],
-  ];
-  claws.forEach(([x, y]) => p.push([x, y, C.shell]));
-  // body — rounded rectangle 4..11 wide, 3..9 tall
-  for (let y = 3; y <= 9; y++) {
-    for (let x = 4; x <= 11; x++) {
-      // round corners
-      if ((y === 3 || y === 9) && (x === 4 || x === 11)) continue;
-      p.push([x, y, C.shell]);
-    }
-  }
-  // shadow underside
-  for (let x = 5; x <= 10; x++) p.push([x, 9, C.shellDark]);
-  p.push([4, 8, C.shellDark]);
-  p.push([11, 8, C.shellDark]);
-  // highlight
-  p.push([5, 4, C.shellHi]);
-  p.push([6, 3, C.shellHi]);
-  // eyes (whites + pupils)
-  p.push([6, 5, C.eyeWhite]);
-  p.push([9, 5, C.eyeWhite]);
-  p.push([6, 5, C.eye]); // override pixel: pupil
-  p.push([9, 5, C.eye]);
-  // mouth
-  p.push([7, 7, C.mouth]);
-  p.push([8, 7, C.mouth]);
-  // feet (legs) — drawn separately so we can animate them
-  return p;
-})();
+// 16 cols x 14 rows. Eyes, claws and shading all painted in.
+const CRAB_ROWS_STATIC = [
+  "................",
+  "..##........##..",
+  ".#cc#......#cc#.",
+  ".#cc#.####.#cc#.",
+  "..##.#hhhh#.##..",
+  "....#oohhoo#....",
+  "...#oowookoo#...",
+  "...#ooowwooo#...",  // overwritten below for eyes
+  "...#osskksso#...",
+  "....#ssssss#....",
+  ".....######.....",
+  "................",
+  "................",
+  "................",
+];
 
-function PixelCrab({ kicking = false }: { kicking?: boolean }) {
-  // 16x12 viewbox, but extend to 16x14 for legs
+// Build crab pixels with eyes painted on top (so whites + pupils render cleanly).
+function CrabSprite({ kickRightLeg = false }: { kickRightLeg?: boolean }) {
+  // Base body rows
+  const rows = [
+    "................",
+    "..##........##..",
+    ".#cc#......#cc#.",
+    ".#cc#.####.#cc#.",
+    "..##.#hhhh#.##..",
+    "....#oooooo#....",
+    "...#oooooooo#...",
+    "...#oooooooo#...",
+    "...#osssssso#...",
+    "....#ssssss#....",
+    ".....######.....",
+    "................",
+    "................",
+    "................",
+  ];
+  // Eyes: 2-pixel-wide whites with a 1-pixel black pupil each
+  const eyesAndMouth: { x: number; y: number; fill: string }[] = [
+    // left eye white
+    { x: 5, y: 6, fill: "#ffffff" },
+    { x: 6, y: 6, fill: "#ffffff" },
+    // right eye white
+    { x: 9, y: 6, fill: "#ffffff" },
+    { x: 10, y: 6, fill: "#ffffff" },
+    // pupils — looking slightly inward
+    { x: 6, y: 6, fill: "#1a1a1a" },
+    { x: 9, y: 6, fill: "#1a1a1a" },
+    // tiny smile
+    { x: 7, y: 8, fill: "#1a1a1a" },
+    { x: 8, y: 8, fill: "#1a1a1a" },
+  ];
+
+  // Legs (4 pixels under body). Right two form the "kicking" group.
+  const staticLegs = [
+    { x: 5, y: 11, fill: CRAB_PALETTE["#"] },
+    { x: 6, y: 11, fill: CRAB_PALETTE["#"] },
+  ];
+  const kickLegs = [
+    { x: 9, y: 11, fill: CRAB_PALETTE["#"] },
+    { x: 10, y: 11, fill: CRAB_PALETTE["#"] },
+  ];
+
+  const cells: JSX.Element[] = [];
+  rows.forEach((row, y) => {
+    [...row].forEach((ch, x) => {
+      const fill = CRAB_PALETTE[ch as keyof typeof CRAB_PALETTE];
+      if (fill) cells.push(<rect key={`b-${x}-${y}`} x={x} y={y} width={1} height={1} fill={fill} />);
+    });
+  });
+  eyesAndMouth.forEach((p, i) => cells.push(<rect key={`f-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />));
+  staticLegs.forEach((p, i) => cells.push(<rect key={`sl-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />));
+
   return (
     <svg
       viewBox="0 0 16 14"
@@ -112,134 +177,360 @@ function PixelCrab({ kicking = false }: { kicking?: boolean }) {
       style={{ shapeRendering: "crispEdges", imageRendering: "pixelated" }}
       aria-hidden
     >
-      {CRAB_PIXELS.map(([x, y, fill], i) => (
-        <rect key={i} x={x} y={y} width={1} height={1} fill={fill} />
-      ))}
-      {/* legs — left static, right kicks */}
-      <g fill={C.shellDark}>
-        <rect x={5} y={10} width={1} height={1} />
-        <rect x={4} y={11} width={1} height={1} />
-        <rect x={7} y={10} width={1} height={1} />
-        <rect x={7} y={11} width={1} height={1} />
-      </g>
-      {/* kicking leg group (right side) */}
+      {cells}
+      {/* Right leg group — animates for World Cup kick */}
       <g
-        fill={C.shellDark}
         style={{
-          transformOrigin: "10px 10px",
-          animation: kicking ? "crab-kick 0.9s ease-in-out infinite" : "none",
+          transformOrigin: "9.5px 10.5px",
+          transformBox: "fill-box",
+          animation: kickRightLeg ? "crab-kick 0.9s ease-in-out infinite" : "none",
         }}
       >
-        <rect x={9} y={10} width={1} height={1} />
-        <rect x={10} y={10} width={1} height={1} />
-        <rect x={10} y={11} width={1} height={1} />
-        <rect x={11} y={11} width={1} height={1} />
+        {kickLegs.map((p, i) => (
+          <rect key={`kl-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />
+        ))}
       </g>
     </svg>
   );
 }
 
-function PixelSoccerBall() {
-  // 8x8 pixel soccer ball
-  const W = "#ffffff";
-  const B = "#1a1a1a";
-  const S = "#cccccc";
-  const grid: (string | null)[][] = [
-    [null, null, W, W, W, W, null, null],
-    [null, W, W, B, B, W, W, null],
-    [W, W, B, W, W, B, W, W],
-    [W, B, W, W, W, W, B, W],
-    [W, B, W, W, W, W, B, S],
-    [W, W, B, W, W, B, S, S],
-    [null, W, W, B, B, S, S, null],
-    [null, null, W, S, S, S, null, null],
-  ];
-  return (
-    <svg
-      viewBox="0 0 8 8"
-      className="h-6 w-6"
-      style={{ shapeRendering: "crispEdges", imageRendering: "pixelated" }}
-      aria-hidden
-    >
-      {grid.flatMap((row, y) =>
-        row.map((c, x) =>
-          c ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={c} /> : null,
-        ),
-      )}
-    </svg>
-  );
-}
+/* ---------- Accessory sprites (all pixel art) ---------- */
+
+// 8x8 soccer ball
+const BALL_ROWS = [
+  "..wwww..",
+  ".wwkkww.",
+  "wwkwwkww",
+  "wkwwwwkw",
+  "wkwwwwks",
+  "wwkwwkss",
+  ".wwkkss.",
+  "..wsss..",
+];
+const BALL_PAL = { w: "#ffffff", k: "#1a1a1a", s: "#bdbdbd" };
+
+// 10x7 football (American)
+const FOOTBALL_ROWS = [
+  "...####...",
+  "..#ssss#..",
+  ".#sswwss#.",
+  "#sswwwwss#",
+  ".#sswwss#.",
+  "..#ssss#..",
+  "...####...",
+];
+const FOOTBALL_PAL = { "#": "#3a1d0a", s: "#8b4513", w: "#ffffff" };
+
+// 8x8 leaf
+const LEAF_ROWS = [
+  "...##...",
+  "..#oo#..",
+  ".#oooo#.",
+  "#oossoo#",
+  "#osssso#",
+  ".#ooss#.",
+  "..#ss#..",
+  "...##...",
+];
+const LEAF_AUTUMN_PAL = { "#": "#5a2a0a", o: "#ff8a3d", s: "#c44a18" };
+const LEAF_RED_PAL = { "#": "#5a0a0a", o: "#e84a3a", s: "#a02020" };
+
+// 7x7 snowflake
+const SNOW_ROWS = [
+  "...#...",
+  "#..#..#",
+  ".#.#.#.",
+  "###W###",
+  ".#.#.#.",
+  "#..#..#",
+  "...#...",
+];
+const SNOW_PAL = { "#": "#cfe9ff", W: "#ffffff" };
+
+// 9x8 pumpkin
+const PUMP_ROWS = [
+  "...#g....",
+  "..#go#...",
+  ".#oooo#..",
+  "#oo##oo#.",
+  "#o#oo#o#.",
+  "#oo##oo#.",
+  ".#oooo#..",
+  "..####...",
+];
+const PUMP_PAL = { "#": "#5a2a05", o: "#ff8a1e", g: "#2e7d32" };
+
+// 7x6 heart
+const HEART_ROWS = [
+  ".##.##.",
+  "#oo#oo#",
+  "#ooooo#",
+  ".#ooo#.",
+  "..#o#..",
+  "...#...",
+];
+const HEART_PAL = { "#": "#7a0a1f", o: "#ff4a6a" };
+
+// 7x7 clover
+const CLOVER_ROWS = [
+  "..#g#..",
+  ".#ggg#.",
+  "#ggwgg#",
+  ".#ggg#.",
+  "...g...",
+  "...g...",
+  "..ggg..",
+];
+const CLOVER_PAL = { "#": "#0d3a14", g: "#3aa84a", w: "#a8e0b0" };
+
+// 9x9 sun
+const SUN_ROWS = [
+  "...#.#...",
+  ".#.###.#.",
+  "..#yyy#..",
+  "#.yywwy.#",
+  "##yyyyy##",
+  "#.yywwy.#",
+  "..#yyy#..",
+  ".#.###.#.",
+  "...#.#...",
+];
+const SUN_PAL = { "#": "#a05a00", y: "#ffd23a", w: "#fff3a8" };
+
+// 9x9 firework
+const FIRE_ROWS = [
+  "....#....",
+  ".#..r..#.",
+  "..#.r.#..",
+  "...#r#...",
+  "#rrrwrrr#",
+  "...#r#...",
+  "..#.r.#..",
+  ".#..r..#.",
+  "....#....",
+];
+const FIRE_PAL = { "#": "#ff5a5a", r: "#ffd23a", w: "#ffffff" };
+
+// 9x7 santa hat
+const SANTA_ROWS = [
+  ".....##W.",
+  "....##W..",
+  "...##W...",
+  "..##r#...",
+  ".##rrr#..",
+  "##rrrrr#.",
+  "#WWWWWW#.",
+];
+const SANTA_PAL = { "#": "#3a0a0a", r: "#e63946", W: "#ffffff" };
+
+// 9x9 flower
+const FLOWER_ROWS = [
+  "..#p#....",
+  ".#ppp#...",
+  "#pppyp#..",
+  "#ppyyp#..",
+  ".#ppp#g..",
+  "...g.gg..",
+  "..gg.g...",
+  ".g..gg...",
+  "....g....",
+];
+const FLOWER_PAL = { "#": "#5a0a4a", p: "#ff8acb", y: "#ffd23a", g: "#3aa84a" };
+
+// 9x9 egg (easter)
+const EGG_ROWS = [
+  "...###...",
+  "..#www#..",
+  ".#wpwpw#.",
+  "#wwwwwww#",
+  "#wbwwwbw#",
+  "#wwwwwww#",
+  "#wpwpwpw#",
+  ".#wwwww#.",
+  "..#####..",
+];
+const EGG_PAL = { "#": "#a05a3a", w: "#fff3e0", p: "#ff8acb", b: "#7ac3ff" };
+
+// 7x7 turkey
+const TURKEY_ROWS = [
+  "y.r.o.b",
+  "yy#r#ob",
+  ".#ooo#.",
+  "#oywwo#",
+  "#ooooo#",
+  ".#ooo#.",
+  "..#.#..",
+];
+const TURKEY_PAL = { "#": "#3a1a05", o: "#a85a2a", w: "#ffffff", y: "#ffd23a", r: "#c44a18", b: "#5a2a05" };
+
+// 7x9 pencil (back-to-school)
+const PENCIL_ROWS = [
+  "..#k#..",
+  ".#yyy#.",
+  "#yyyyy#",
+  "#yYyYy#",
+  "#yyyyy#",
+  ".#ppp#.",
+  "..#p#..",
+  "...g...",
+  "...g...",
+];
+const PENCIL_PAL = { "#": "#3a2a05", k: "#1a1a1a", y: "#ffd23a", Y: "#e0a800", p: "#ff8a8a", g: "#a05a2a" };
+
+// 7x6 confetti / party (new year)
+const CONFETTI_ROWS = [
+  "r.y.g.b",
+  ".r.y.g.",
+  "y.g.b.r",
+  ".g.b.r.",
+  "b.r.y.g",
+  ".b.r.y.",
+];
+const CONFETTI_PAL = { r: "#ff5a5a", y: "#ffd23a", g: "#3aa84a", b: "#5aa8ff" };
+
+// 7x7 seedling (default)
+const SEED_ROWS = [
+  "....g..",
+  "...gg..",
+  "g.gggg.",
+  "ggggg..",
+  "..g....",
+  "..g....",
+  ".ggg...",
+];
+const SEED_PAL = { g: "#3aa84a" };
+
+/* ---------- Accessory rendering ---------- */
 
 function Accessory({ season }: { season: Season }) {
   switch (season) {
     case "worldcup":
+      // Soccer ball juggled by the right foot
       return (
         <div
           className="pointer-events-none absolute"
           style={{
-            right: "-2px",
-            top: "-2px",
+            right: "-4px",
+            top: "0px",
             animation: "ball-juggle 0.9s ease-in-out infinite",
           }}
         >
-          <PixelSoccerBall />
+          <PixelSprite rows={BALL_ROWS} palette={BALL_PAL} className="h-7 w-7" />
         </div>
       );
     case "superbowl":
       return (
         <div
-          className="pointer-events-none absolute -top-3 -right-2 text-2xl"
-          style={{ animation: "mascot-throw 1.6s ease-in-out infinite" }}
+          className="pointer-events-none absolute -top-3 -right-3"
+          style={{ animation: "throw-spin 1.6s ease-in-out infinite" }}
         >
-          🏈
+          <PixelSprite rows={FOOTBALL_ROWS} palette={FOOTBALL_PAL} className="h-7 w-9" />
         </div>
       );
     case "fall":
       return (
         <>
-          <div className="pointer-events-none absolute -top-3 left-1 text-xl" style={{ animation: "mascot-fall 2.4s linear infinite" }}>🍂</div>
-          <div className="pointer-events-none absolute -top-4 right-3 text-lg" style={{ animation: "mascot-fall 3s linear .6s infinite" }}>🍁</div>
-          <div className="pointer-events-none absolute -top-2 left-8 text-base" style={{ animation: "mascot-fall 2.8s linear 1.2s infinite" }}>🍂</div>
+          <div className="pointer-events-none absolute -top-3 left-1" style={{ animation: "leaf-fall 2.6s linear infinite" }}>
+            <PixelSprite rows={LEAF_ROWS} palette={LEAF_AUTUMN_PAL} className="h-5 w-5" />
+          </div>
+          <div className="pointer-events-none absolute -top-4 right-2" style={{ animation: "leaf-fall 3.2s linear .6s infinite" }}>
+            <PixelSprite rows={LEAF_ROWS} palette={LEAF_RED_PAL} className="h-4 w-4" />
+          </div>
+          <div className="pointer-events-none absolute -top-2 left-9" style={{ animation: "leaf-fall 2.8s linear 1.4s infinite" }}>
+            <PixelSprite rows={LEAF_ROWS} palette={LEAF_AUTUMN_PAL} className="h-3 w-3" />
+          </div>
         </>
       );
     case "winter":
       return (
         <>
-          <div className="pointer-events-none absolute -top-2 left-2 text-base" style={{ animation: "mascot-fall 3s linear infinite" }}>❄️</div>
-          <div className="pointer-events-none absolute -top-4 right-2 text-sm" style={{ animation: "mascot-fall 3.6s linear .8s infinite" }}>❄️</div>
+          <div className="pointer-events-none absolute -top-2 left-2" style={{ animation: "leaf-fall 3.2s linear infinite" }}>
+            <PixelSprite rows={SNOW_ROWS} palette={SNOW_PAL} className="h-4 w-4" />
+          </div>
+          <div className="pointer-events-none absolute -top-4 right-1" style={{ animation: "leaf-fall 3.8s linear .9s infinite" }}>
+            <PixelSprite rows={SNOW_ROWS} palette={SNOW_PAL} className="h-3 w-3" />
+          </div>
+          <div className="pointer-events-none absolute -top-1 left-10" style={{ animation: "leaf-fall 4.2s linear 1.5s infinite" }}>
+            <PixelSprite rows={SNOW_ROWS} palette={SNOW_PAL} className="h-3 w-3" />
+          </div>
         </>
       );
     case "christmas":
-      return <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">🎅</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2">
+          <PixelSprite rows={SANTA_ROWS} palette={SANTA_PAL} className="h-7 w-9" />
+        </div>
+      );
     case "newyear":
-      return <div className="pointer-events-none absolute -top-4 right-0 text-2xl animate-pulse">🎉</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 -right-1" style={{ animation: "pop 1.4s ease-in-out infinite" }}>
+          <PixelSprite rows={CONFETTI_ROWS} palette={CONFETTI_PAL} className="h-6 w-7" />
+        </div>
+      );
     case "halloween":
-      return <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">🎃</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 -right-1" style={{ animation: "pop 1.8s ease-in-out infinite" }}>
+          <PixelSprite rows={PUMP_ROWS} palette={PUMP_PAL} className="h-7 w-8" />
+        </div>
+      );
     case "thanksgiving":
-      return <div className="pointer-events-none absolute -top-3 right-0 text-2xl">🦃</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 -right-1">
+          <PixelSprite rows={TURKEY_ROWS} palette={TURKEY_PAL} className="h-7 w-7" />
+        </div>
+      );
     case "valentines":
-      return <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-2xl animate-pulse">❤️</div>;
+      return (
+        <div className="pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2" style={{ animation: "pop 1.2s ease-in-out infinite" }}>
+          <PixelSprite rows={HEART_ROWS} palette={HEART_PAL} className="h-6 w-6" />
+        </div>
+      );
     case "stpatricks":
-      return <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">🍀</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2" style={{ animation: "spin-slow 4s linear infinite" }}>
+          <PixelSprite rows={CLOVER_ROWS} palette={CLOVER_PAL} className="h-6 w-6" />
+        </div>
+      );
     case "easter":
-      return <div className="pointer-events-none absolute -top-3 right-0 text-2xl">🐣</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 -right-2" style={{ animation: "wobble 2.4s ease-in-out infinite" }}>
+          <PixelSprite rows={EGG_ROWS} palette={EGG_PAL} className="h-7 w-7" />
+        </div>
+      );
     case "spring":
       return (
-        <>
-          <div className="pointer-events-none absolute -top-3 left-2 text-lg">🌸</div>
-          <div className="pointer-events-none absolute -top-2 right-1 text-base">🌼</div>
-        </>
+        <div className="pointer-events-none absolute -top-3 -right-2" style={{ animation: "wobble 3s ease-in-out infinite" }}>
+          <PixelSprite rows={FLOWER_ROWS} palette={FLOWER_PAL} className="h-7 w-7" />
+        </div>
       );
     case "summer":
-      return <div className="pointer-events-none absolute -top-3 right-1 text-2xl">☀️</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 -right-2" style={{ animation: "spin-slow 6s linear infinite" }}>
+          <PixelSprite rows={SUN_ROWS} palette={SUN_PAL} className="h-7 w-7" />
+        </div>
+      );
     case "july4":
-      return <div className="pointer-events-none absolute -top-3 right-0 text-2xl animate-pulse">🎆</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 -right-2" style={{ animation: "pop 1.2s ease-in-out infinite" }}>
+          <PixelSprite rows={FIRE_ROWS} palette={FIRE_PAL} className="h-7 w-7" />
+        </div>
+      );
     case "backToSchool":
-      return <div className="pointer-events-none absolute -top-2 right-0 text-xl">✏️</div>;
+      return (
+        <div className="pointer-events-none absolute -top-3 -right-1" style={{ animation: "wobble 2s ease-in-out infinite" }}>
+          <PixelSprite rows={PENCIL_ROWS} palette={PENCIL_PAL} className="h-7 w-6" />
+        </div>
+      );
     default:
-      return <div className="pointer-events-none absolute -top-2 right-0 text-lg">🌱</div>;
+      return (
+        <div className="pointer-events-none absolute -top-2 -right-1">
+          <PixelSprite rows={SEED_ROWS} palette={SEED_PAL} className="h-6 w-6" />
+        </div>
+      );
   }
 }
+
+void CRAB_ROWS_STATIC; // reserved for future variants
 
 export function SeasonalMascot() {
   const [open, setOpen] = useState(false);
@@ -253,26 +544,36 @@ export function SeasonalMascot() {
           0%, 100% { transform: translateY(0) }
           50% { transform: translateY(-4px) }
         }
-        @keyframes mascot-fall {
-          0% { transform: translateY(-8px) rotate(0deg); opacity: 0 }
+        @keyframes leaf-fall {
+          0% { transform: translateY(-10px) rotate(0deg); opacity: 0 }
           15% { opacity: 1 }
-          100% { transform: translateY(80px) rotate(220deg); opacity: 0 }
+          100% { transform: translateY(90px) rotate(220deg); opacity: 0 }
         }
-        @keyframes mascot-throw {
+        @keyframes throw-spin {
           0%, 100% { transform: translate(0,0) rotate(0deg) }
-          50% { transform: translate(14px,-18px) rotate(60deg) }
+          50% { transform: translate(16px,-20px) rotate(60deg) }
         }
-        /* World Cup: ball arcs up from foot, spins, and falls back */
         @keyframes ball-juggle {
-          0%   { transform: translate(0, 14px) rotate(0deg) }
-          50%  { transform: translate(-4px, -18px) rotate(180deg) }
-          100% { transform: translate(0, 14px) rotate(360deg) }
+          0%   { transform: translate(0, 18px) rotate(0deg) scale(1) }
+          45%  { transform: translate(-6px, -22px) rotate(180deg) scale(0.95) }
+          55%  { transform: translate(-6px, -22px) rotate(220deg) scale(0.95) }
+          100% { transform: translate(0, 18px) rotate(360deg) scale(1) }
         }
-        /* Right leg kicks up as the ball lands */
         @keyframes crab-kick {
           0%, 40%, 100% { transform: translateY(0) rotate(0deg) }
-          50%           { transform: translateY(-3px) rotate(-25deg) }
+          50%           { transform: translateY(-2px) rotate(-22deg) }
           60%           { transform: translateY(0) rotate(0deg) }
+        }
+        @keyframes pop {
+          0%, 100% { transform: scale(1) }
+          50% { transform: scale(1.15) }
+        }
+        @keyframes wobble {
+          0%, 100% { transform: rotate(-6deg) }
+          50% { transform: rotate(6deg) }
+        }
+        @keyframes spin-slow {
+          to { transform: rotate(360deg) }
         }
       `}</style>
       <button
@@ -283,7 +584,7 @@ export function SeasonalMascot() {
         style={{ animation: "mascot-bob 2.6s ease-in-out infinite" }}
       >
         <div className="relative">
-          <PixelCrab kicking={kicking} />
+          <CrabSprite kickRightLeg={kicking} />
           <Accessory season={season.key} />
         </div>
       </button>
