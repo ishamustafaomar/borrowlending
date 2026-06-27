@@ -1,17 +1,6 @@
-import { useImpact } from "@/lib/borrow/hooks";
-import { useCountUp } from "@/lib/borrow/useCountUp";
 import { Leaf } from "lucide-react";
 
 export function ImpactBanner() {
-  const { data } = useImpact();
-  // Override for demo consistency if needed, but respect requested numbers
-  const impact = data ?? { itemsShared: 16, dollarsSaved: 210, thingsNotBought: 16 };
-  
-  // Use requested hardcoded values for the hackathon demo as requested
-  const items = 16;
-  const saved = 210;
-  const not = 16;
-
   return (
     <section
       className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-accent to-secondary p-5 sm:p-6 shadow-[var(--shadow-card)]"
