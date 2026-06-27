@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 
 /**
- * Seasonal mascot — a simple Claude-style round coral crab that
- * adapts to the time of year. Pure SVG + CSS, no external assets.
+ * Seasonal mascot — a pixel-art coral crab that adapts to the time of year.
+ * Pure inline SVG (crisp-edges) + CSS keyframes. No external assets.
  */
 
 type Season =
@@ -30,19 +30,15 @@ interface SeasonInfo {
 }
 
 function detectSeason(date: Date): SeasonInfo {
-  const m = date.getMonth() + 1; // 1-12
+  const m = date.getMonth() + 1;
   const d = date.getDate();
-  const md = m * 100 + d;
-
-  // Super Bowl — early February (usually 2nd Sun)
   if (m === 2 && d <= 14) return { key: "superbowl", label: "Super Bowl Sunday", caption: "Hut, hut, borrow!" };
   if (m === 2 && d >= 13 && d <= 15) return { key: "valentines", label: "Valentine's", caption: "Share the love." };
   if (m === 3 && d >= 14 && d <= 18) return { key: "stpatricks", label: "St. Paddy's", caption: "Lucky to share." };
-  // FIFA World Cup 2026: June 11 – July 19
   if ((m === 6 && d >= 11) || (m === 7 && d <= 19)) return { key: "worldcup", label: "World Cup", caption: "Goooaaal-sharing!" };
   if (m === 7 && d >= 1 && d <= 6) return { key: "july4", label: "4th of July", caption: "Block-party energy." };
-  if (m >= 3 && m <= 5) return { key: "spring", label: "Spring", caption: "Fresh-air sharing." };
   if (m === 4 && d >= 1 && d <= 21) return { key: "easter", label: "Easter", caption: "Hop on over." };
+  if (m >= 3 && m <= 5) return { key: "spring", label: "Spring", caption: "Fresh-air sharing." };
   if (m === 8 || (m === 9 && d <= 10)) return { key: "backToSchool", label: "Back-to-school", caption: "Borrow the basics." };
   if (m === 10 && d >= 25) return { key: "halloween", label: "Halloween", caption: "Spookily sustainable." };
   if (m === 11 && d >= 20 && d <= 30) return { key: "thanksgiving", label: "Thanksgiving", caption: "Grateful for neighbors." };
@@ -51,35 +47,125 @@ function detectSeason(date: Date): SeasonInfo {
   if ((m === 12 && d >= 28) || (m === 1 && d <= 2)) return { key: "newyear", label: "New Year", caption: "New year, less stuff." };
   if (m === 12 || m === 1 || m === 2) return { key: "winter", label: "Winter", caption: "Cozy on the block." };
   if (m === 6 || m === 7 || m === 8) return { key: "summer", label: "Summer", caption: "Sun's out, share's out." };
-  void md;
   return { key: "default", label: "Today", caption: "Borrow, don't buy." };
 }
 
-function Crab({ tilt = 0 }: { tilt?: number }) {
+/* ---------- Pixel art primitives ----------
+   Each crab is drawn on a 16-wide pixel grid. We compose with <rect>
+   pixels so it stays crisp at any size via shape-rendering: crispEdges.
+*/
+
+type Pixel = [number, number, string]; // x, y, color
+
+// Coral primary, shadow, white highlight, black
+const C = {
+  shell: "#ff7a59",
+  shellDark: "#e0593a",
+  shellHi: "#ffb39a",
+  eye: "#1a1a1a",
+  eyeWhite: "#ffffff",
+  mouth: "#1a1a1a",
+};
+
+// 16x12 pixel crab body (rows: y=0 top)
+const CRAB_PIXELS: Pixel[] = (() => {
+  const p: Pixel[] = [];
+  // claws (left & right, raised)
+  const claws = [
+    [1, 5], [2, 5], [1, 6], [2, 6], [2, 4],
+    [13, 5], [14, 5], [13, 6], [14, 6], [13, 4],
+  ];
+  claws.forEach(([x, y]) => p.push([x, y, C.shell]));
+  // body — rounded rectangle 4..11 wide, 3..9 tall
+  for (let y = 3; y <= 9; y++) {
+    for (let x = 4; x <= 11; x++) {
+      // round corners
+      if ((y === 3 || y === 9) && (x === 4 || x === 11)) continue;
+      p.push([x, y, C.shell]);
+    }
+  }
+  // shadow underside
+  for (let x = 5; x <= 10; x++) p.push([x, 9, C.shellDark]);
+  p.push([4, 8, C.shellDark]);
+  p.push([11, 8, C.shellDark]);
+  // highlight
+  p.push([5, 4, C.shellHi]);
+  p.push([6, 3, C.shellHi]);
+  // eyes (whites + pupils)
+  p.push([6, 5, C.eyeWhite]);
+  p.push([9, 5, C.eyeWhite]);
+  p.push([6, 5, C.eye]); // override pixel: pupil
+  p.push([9, 5, C.eye]);
+  // mouth
+  p.push([7, 7, C.mouth]);
+  p.push([8, 7, C.mouth]);
+  // feet (legs) — drawn separately so we can animate them
+  return p;
+})();
+
+function PixelCrab({ kicking = false }: { kicking?: boolean }) {
+  // 16x12 viewbox, but extend to 16x14 for legs
   return (
     <svg
-      viewBox="0 0 100 100"
+      viewBox="0 0 16 14"
       className="h-20 w-20 drop-shadow-md"
-      style={{ transform: `rotate(${tilt}deg)` }}
+      style={{ shapeRendering: "crispEdges", imageRendering: "pixelated" }}
       aria-hidden
     >
-      {/* legs */}
-      <g stroke="hsl(var(--primary))" strokeWidth="3" strokeLinecap="round" fill="none">
-        <path d="M28 62 L18 70" />
-        <path d="M30 70 L22 80" />
-        <path d="M72 62 L82 70" />
-        <path d="M70 70 L78 80" />
+      {CRAB_PIXELS.map(([x, y, fill], i) => (
+        <rect key={i} x={x} y={y} width={1} height={1} fill={fill} />
+      ))}
+      {/* legs — left static, right kicks */}
+      <g fill={C.shellDark}>
+        <rect x={5} y={10} width={1} height={1} />
+        <rect x={4} y={11} width={1} height={1} />
+        <rect x={7} y={10} width={1} height={1} />
+        <rect x={7} y={11} width={1} height={1} />
       </g>
-      {/* claws */}
-      <circle cx="20" cy="50" r="7" fill="hsl(var(--primary))" />
-      <circle cx="80" cy="50" r="7" fill="hsl(var(--primary))" />
-      {/* body */}
-      <circle cx="50" cy="55" r="26" fill="hsl(var(--coral))" />
-      {/* eyes */}
-      <circle cx="42" cy="50" r="3" fill="#1a1a1a" />
-      <circle cx="58" cy="50" r="3" fill="#1a1a1a" />
-      {/* smile */}
-      <path d="M44 62 Q50 67 56 62" stroke="#1a1a1a" strokeWidth="2" fill="none" strokeLinecap="round" />
+      {/* kicking leg group (right side) */}
+      <g
+        fill={C.shellDark}
+        style={{
+          transformOrigin: "10px 10px",
+          animation: kicking ? "crab-kick 0.9s ease-in-out infinite" : "none",
+        }}
+      >
+        <rect x={9} y={10} width={1} height={1} />
+        <rect x={10} y={10} width={1} height={1} />
+        <rect x={10} y={11} width={1} height={1} />
+        <rect x={11} y={11} width={1} height={1} />
+      </g>
+    </svg>
+  );
+}
+
+function PixelSoccerBall() {
+  // 8x8 pixel soccer ball
+  const W = "#ffffff";
+  const B = "#1a1a1a";
+  const S = "#cccccc";
+  const grid: (string | null)[][] = [
+    [null, null, W, W, W, W, null, null],
+    [null, W, W, B, B, W, W, null],
+    [W, W, B, W, W, B, W, W],
+    [W, B, W, W, W, W, B, W],
+    [W, B, W, W, W, W, B, S],
+    [W, W, B, W, W, B, S, S],
+    [null, W, W, B, B, S, S, null],
+    [null, null, W, S, S, S, null, null],
+  ];
+  return (
+    <svg
+      viewBox="0 0 8 8"
+      className="h-6 w-6"
+      style={{ shapeRendering: "crispEdges", imageRendering: "pixelated" }}
+      aria-hidden
+    >
+      {grid.flatMap((row, y) =>
+        row.map((c, x) =>
+          c ? <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill={c} /> : null,
+        ),
+      )}
     </svg>
   );
 }
@@ -88,12 +174,25 @@ function Accessory({ season }: { season: Season }) {
   switch (season) {
     case "worldcup":
       return (
-        // soccer ball bouncing next to crab
-        <div className="pointer-events-none absolute -right-2 bottom-2 text-3xl animate-bounce">⚽</div>
+        <div
+          className="pointer-events-none absolute"
+          style={{
+            right: "-2px",
+            top: "-2px",
+            animation: "ball-juggle 0.9s ease-in-out infinite",
+          }}
+        >
+          <PixelSoccerBall />
+        </div>
       );
     case "superbowl":
       return (
-        <div className="pointer-events-none absolute -top-3 -right-2 text-2xl" style={{ animation: "mascot-throw 1.6s ease-in-out infinite" }}>🏈</div>
+        <div
+          className="pointer-events-none absolute -top-3 -right-2 text-2xl"
+          style={{ animation: "mascot-throw 1.6s ease-in-out infinite" }}
+        >
+          🏈
+        </div>
       );
     case "fall":
       return (
@@ -144,15 +243,8 @@ function Accessory({ season }: { season: Season }) {
 
 export function SeasonalMascot() {
   const [open, setOpen] = useState(false);
-  // recompute once per mount; seasons don't change mid-session
   const season = useMemo(() => detectSeason(new Date()), []);
-
-  // small idle bob
-  useEffect(() => {
-    // nothing — bob via CSS
-  }, []);
-
-  const tilt = season.key === "worldcup" || season.key === "superbowl" ? -8 : 0;
+  const kicking = season.key === "worldcup";
 
   return (
     <>
@@ -170,6 +262,18 @@ export function SeasonalMascot() {
           0%, 100% { transform: translate(0,0) rotate(0deg) }
           50% { transform: translate(14px,-18px) rotate(60deg) }
         }
+        /* World Cup: ball arcs up from foot, spins, and falls back */
+        @keyframes ball-juggle {
+          0%   { transform: translate(0, 14px) rotate(0deg) }
+          50%  { transform: translate(-4px, -18px) rotate(180deg) }
+          100% { transform: translate(0, 14px) rotate(360deg) }
+        }
+        /* Right leg kicks up as the ball lands */
+        @keyframes crab-kick {
+          0%, 40%, 100% { transform: translateY(0) rotate(0deg) }
+          50%           { transform: translateY(-3px) rotate(-25deg) }
+          60%           { transform: translateY(0) rotate(0deg) }
+        }
       `}</style>
       <button
         type="button"
@@ -179,7 +283,7 @@ export function SeasonalMascot() {
         style={{ animation: "mascot-bob 2.6s ease-in-out infinite" }}
       >
         <div className="relative">
-          <Crab tilt={tilt} />
+          <PixelCrab kicking={kicking} />
           <Accessory season={season.key} />
         </div>
       </button>
