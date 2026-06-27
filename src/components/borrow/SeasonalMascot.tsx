@@ -117,47 +117,50 @@ const CRAB_ROWS_STATIC = [
 
 // Build crab pixels with eyes painted on top (so whites + pupils render cleanly).
 function CrabSprite({ kickRightLeg = false }: { kickRightLeg?: boolean }) {
-  // Base body rows
+  // Body only — no claws. 16x14 grid, body sits in cols 4..11, rows 2..8.
   const rows = [
     "................",
-    "..##........##..",
-    ".#cc#......#cc#.",
-    ".#cc#.####.#cc#.",
-    "..##.#hhhh#.##..",
-    "....#oooooo#....",
+    "................",
+    "....########....",
+    "...#oohhhhoo#...",
+    "...#oooooooo#...",
     "...#oooooooo#...",
     "...#oooooooo#...",
     "...#osssssso#...",
-    "....#ssssss#....",
-    ".....######.....",
+    "....########....",
+    "................",
+    "................",
     "................",
     "................",
     "................",
   ];
-  // Eyes: 2-pixel-wide whites with a 1-pixel black pupil each
+  // Eyes: simple black dots, Claude-Code style. Smile two pixels below.
   const eyesAndMouth: { x: number; y: number; fill: string }[] = [
-    // left eye white
-    { x: 5, y: 6, fill: "#ffffff" },
-    { x: 6, y: 6, fill: "#ffffff" },
-    // right eye white
-    { x: 9, y: 6, fill: "#ffffff" },
-    { x: 10, y: 6, fill: "#ffffff" },
-    // pupils — looking slightly inward
-    { x: 6, y: 6, fill: "#1a1a1a" },
-    { x: 9, y: 6, fill: "#1a1a1a" },
-    // tiny smile
-    { x: 7, y: 8, fill: "#1a1a1a" },
-    { x: 8, y: 8, fill: "#1a1a1a" },
+    { x: 6, y: 5, fill: "#1a1a1a" },
+    { x: 9, y: 5, fill: "#1a1a1a" },
+    { x: 7, y: 7, fill: "#1a1a1a" },
+    { x: 8, y: 7, fill: "#1a1a1a" },
   ];
 
-  // Legs (4 pixels under body). Right two form the "kicking" group.
-  const staticLegs = [
-    { x: 5, y: 11, fill: CRAB_PALETTE["#"] },
-    { x: 6, y: 11, fill: CRAB_PALETTE["#"] },
+  const OUT = CRAB_PALETTE["#"];
+  // Three legs per side, each a 3-pixel diagonal pointing down-and-out.
+  const leftLegs = [
+    // top
+    { x: 2, y: 3, fill: OUT }, { x: 1, y: 4, fill: OUT }, { x: 0, y: 5, fill: OUT },
+    // middle
+    { x: 2, y: 5, fill: OUT }, { x: 1, y: 6, fill: OUT }, { x: 0, y: 7, fill: OUT },
+    // bottom (static)
+    { x: 2, y: 7, fill: OUT }, { x: 1, y: 8, fill: OUT }, { x: 0, y: 9, fill: OUT },
   ];
-  const kickLegs = [
-    { x: 9, y: 11, fill: CRAB_PALETTE["#"] },
-    { x: 10, y: 11, fill: CRAB_PALETTE["#"] },
+  const rightStaticLegs = [
+    // top
+    { x: 13, y: 3, fill: OUT }, { x: 14, y: 4, fill: OUT }, { x: 15, y: 5, fill: OUT },
+    // middle
+    { x: 13, y: 5, fill: OUT }, { x: 14, y: 6, fill: OUT }, { x: 15, y: 7, fill: OUT },
+  ];
+  // Bottom-right leg kicks the soccer ball
+  const rightKickLeg = [
+    { x: 13, y: 7, fill: OUT }, { x: 14, y: 8, fill: OUT }, { x: 15, y: 9, fill: OUT },
   ];
 
   const cells: JSX.Element[] = [];
@@ -168,7 +171,8 @@ function CrabSprite({ kickRightLeg = false }: { kickRightLeg?: boolean }) {
     });
   });
   eyesAndMouth.forEach((p, i) => cells.push(<rect key={`f-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />));
-  staticLegs.forEach((p, i) => cells.push(<rect key={`sl-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />));
+  leftLegs.forEach((p, i) => cells.push(<rect key={`ll-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />));
+  rightStaticLegs.forEach((p, i) => cells.push(<rect key={`rl-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />));
 
   return (
     <svg
@@ -178,15 +182,15 @@ function CrabSprite({ kickRightLeg = false }: { kickRightLeg?: boolean }) {
       aria-hidden
     >
       {cells}
-      {/* Right leg group — animates for World Cup kick */}
+      {/* Bottom-right leg group — animates for World Cup kick */}
       <g
         style={{
-          transformOrigin: "9.5px 10.5px",
+          transformOrigin: "13px 7px",
           transformBox: "fill-box",
           animation: kickRightLeg ? "crab-kick 0.9s ease-in-out infinite" : "none",
         }}
       >
-        {kickLegs.map((p, i) => (
+        {rightKickLeg.map((p, i) => (
           <rect key={`kl-${i}`} x={p.x} y={p.y} width={1} height={1} fill={p.fill} />
         ))}
       </g>
@@ -196,18 +200,20 @@ function CrabSprite({ kickRightLeg = false }: { kickRightLeg?: boolean }) {
 
 /* ---------- Accessory sprites (all pixel art) ---------- */
 
-// 8x8 soccer ball
+// 10x10 soccer ball — classic black-and-white pentagon pattern
 const BALL_ROWS = [
-  "..wwww..",
-  ".wwkkww.",
-  "wwkwwkww",
-  "wkwwwwkw",
-  "wkwwwwks",
-  "wwkwwkss",
-  ".wwkkss.",
-  "..wsss..",
+  "..oooooo..",
+  ".okkoookko",
+  "okwwkkwwko",
+  "okwkkkkwko",
+  "okkwwwwkko",
+  "okkwwwwkko",
+  "okwkkkkwko",
+  "okwwkkwwko",
+  ".okkoookko",
+  "..oooooo..",
 ];
-const BALL_PAL = { w: "#ffffff", k: "#1a1a1a", s: "#bdbdbd" };
+const BALL_PAL = { o: "#1a1a1a", w: "#ffffff", k: "#1a1a1a" };
 
 // 10x7 football (American)
 const FOOTBALL_ROWS = [
