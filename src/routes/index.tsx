@@ -9,10 +9,12 @@ import { BorrowRequestDialog } from "@/components/borrow/BorrowRequestDialog";
 import { LendItemSheet } from "@/components/borrow/LendItemSheet";
 import { MyBorrowsList } from "@/components/borrow/MyBorrowsList";
 import { SeasonalMascot } from "@/components/borrow/SeasonalMascot";
+import { ProfileSetup } from "@/components/borrow/ProfileSetup";
 import type { Item } from "@/lib/borrow/types";
 import { Sparkles, Loader2, Lightbulb } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/")({
+export const Route = createFileRoute("/")({
+  ssr: false,
   head: () => ({
     meta: [
       { title: "Borrow — the circular economy for future cities" },
@@ -61,6 +63,7 @@ function Home() {
 
   return (
     <div className="min-h-screen bg-background">
+      <ProfileSetup />
       <div className="mx-auto flex max-w-5xl flex-col gap-5 px-4 py-5 sm:px-6 sm:py-8">
         <Header onLend={() => setLendOpen(true)} />
         <ImpactBanner />
@@ -71,9 +74,7 @@ function Home() {
 
         <div
           className={`flex items-start gap-2 rounded-2xl px-4 py-3 text-sm transition-colors ${
-            isCascade
-              ? "bg-coral/10 text-coral"
-              : "bg-accent/60 text-primary"
+            isCascade ? "bg-coral/10 text-coral" : "bg-accent/60 text-primary"
           }`}
         >
           {searching ? (
