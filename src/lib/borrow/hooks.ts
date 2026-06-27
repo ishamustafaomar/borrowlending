@@ -1,49 +1,67 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
+import { useEffect } from "react";
 import {
-  listItems,
-  listMyBorrows,
-  getImpact,
-  smartSearch,
-  requestBorrow,
-  createItem,
-  approveBorrow,
-} from "./api.functions";
+  listItemsLocal,
+  listMyBorrowsLocal,
+  getImpactLocal,
+  smartSearchLocal,
+  requestBorrowLocal,
+  createItemLocal,
+  approveBorrowLocal,
+  type CreateItemInput,
+} from "./local-store";
+
+// Re-render queries when localStorage changes (same tab + cross-tab).
+function useStoreSync() {
+  const qc = useQueryClient();
+  useEffect(() => {
+    const invalidate = () => {
+      qc.invalidateQueries({ queryKey: ["items"] });
+      qc.invalidateQueries({ queryKey: ["borrows"] });
+      qc.invalidateQueries({ queryKey: ["impact"] });
+      qc.invalidateQueries({ queryKey: ["search"] });
+    };
+    window.addEventListener("borrow:store-change", invalidate);
+    window.addEventListener("storage", invalidate);
+    return () => {
+      window.removeEventListener("borrow:store-change", invalidate);
+      window.removeEventListener("storage", invalidate);
+    };
+  }, [qc]);
+}
 
 export function useItems() {
-  const fn = useServerFn(listItems);
-  return useQuery({ queryKey: ["items"], queryFn: () => fn() });
+  useStoreSync();
+  return useQuery({ queryKey: ["items"], queryFn: () => Promise.resolve(listItemsLocal()) });
 }
 
 export function useMyBorrows() {
-  const fn = useServerFn(listMyBorrows);
+  useStoreSync();
   return useQuery({
     queryKey: ["borrows"],
-    queryFn: () => fn(),
+    queryFn: () => Promise.resolve(listMyBorrowsLocal()),
     refetchInterval: 5000,
   });
 }
 
 export function useImpact() {
-  const fn = useServerFn(getImpact);
-  return useQuery({ queryKey: ["impact"], queryFn: () => fn() });
+  useStoreSync();
+  return useQuery({ queryKey: ["impact"], queryFn: () => Promise.resolve(getImpactLocal()) });
 }
 
 export function useSmartSearch(query: string) {
-  const fn = useServerFn(smartSearch);
   return useQuery({
     queryKey: ["search", query],
-    queryFn: () => fn({ data: { query } }),
+    queryFn: () => Promise.resolve(smartSearchLocal(query)),
     placeholderData: (prev) => prev,
   });
 }
 
 export function useRequestBorrow() {
-  const fn = useServerFn(requestBorrow);
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: { itemId: string; dates: string; message: string }) =>
-      fn({ data: input }),
+      Promise.resolve(requestBorrowLocal(input)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["borrows"] });
       qc.invalidateQueries({ queryKey: ["impact"] });
@@ -52,28 +70,24 @@ export function useRequestBorrow() {
 }
 
 export function useCreateItem() {
-  const fn = useServerFn(createItem);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: {
-      name: string;
-      emoji: string;
-      category: string;
-      availability: string;
-      trust_circle: "building" | "block" | "neighborhood";
-    }) => fn({ data: input }),
+    mutationFn: (input: CreateItemInput) => Promise.resolve(createItemLocal(input)),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["items"] });
       qc.invalidateQueries({ queryKey: ["search"] });
+      qc.invalidateQueries({ queryKey: ["impact"] });
     },
   });
 }
 
 export function useApproveBorrow() {
-  const fn = useServerFn(approveBorrow);
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => fn({ data: { id } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["borrows"] }),
+    mutationFn: (id: string) => Promise.resolve(approveBorrowLocal(id)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["borrows"] });
+      qc.invalidateQueries({ queryKey: ["impact"] });
+    },
   });
 }
