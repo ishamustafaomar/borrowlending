@@ -161,9 +161,10 @@ export const getImpact = createServerFn({ method: "GET" })
       estimated_value: number;
     }>;
 
-    const { count: borrowCount } = await context.supabase
+    const { count: approvedBorrows } = await context.supabase
       .from("borrows")
-      .select("id", { count: "exact", head: true });
+      .select("id", { count: "exact", head: true })
+      .eq("status", "approved");
 
     let dollarsSaved = 0;
     let co2KgSaved = 0;
@@ -182,7 +183,7 @@ export const getImpact = createServerFn({ method: "GET" })
     return {
       itemsShared: rows.length,
       dollarsSaved,
-      thingsNotBought: borrowCount ?? 0,
+      thingsNotBought: approvedBorrows ?? 0,
       co2KgSaved,
       landfillItemsDiverted,
       circleBreakdown,
