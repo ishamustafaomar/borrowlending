@@ -200,18 +200,20 @@ function CrabSprite({ kickRightLeg = false }: { kickRightLeg?: boolean }) {
 
 /* ---------- Accessory sprites (all pixel art) ---------- */
 
-// 8x8 soccer ball
+// 10x10 soccer ball — classic black-and-white pentagon pattern
 const BALL_ROWS = [
-  "..wwww..",
-  ".wwkkww.",
-  "wwkwwkww",
-  "wkwwwwkw",
-  "wkwwwwks",
-  "wwkwwkss",
-  ".wwkkss.",
-  "..wsss..",
+  "..oooooo..",
+  ".okkoookko",
+  "okwwkkwwko",
+  "okwkkkkwko",
+  "okkwwwwkko",
+  "okkwwwwkko",
+  "okwkkkkwko",
+  "okwwkkwwko",
+  ".okkoookko",
+  "..oooooo..",
 ];
-const BALL_PAL = { w: "#ffffff", k: "#1a1a1a", s: "#bdbdbd" };
+const BALL_PAL = { o: "#1a1a1a", w: "#ffffff", k: "#1a1a1a" };
 
 // 10x7 football (American)
 const FOOTBALL_ROWS = [
