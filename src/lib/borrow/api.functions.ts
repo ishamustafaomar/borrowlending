@@ -1,9 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { z } from "zod";
-import type { Item, BorrowRow, SearchResult } from "./types";
+import type { Item, BorrowRow, SearchResult, ImpactStats, TrustCircle } from "./types";
 
-// Map raw DB errors to safe user-facing messages; log details server-side.
 function safeError(error: unknown, fallback = "Something went wrong. Please try again."): Error {
   console.error("[borrow api error]", error);
   const code = (error as { code?: string } | null)?.code;
@@ -12,6 +11,18 @@ function safeError(error: unknown, fallback = "Something went wrong. Please try 
   if (code === "23514") return new Error("Invalid value provided.");
   if (code === "42501" || code === "PGRST301") return new Error("You don't have permission to do that.");
   return new Error(fallback);
+}
+
+async function attachKarma(
+  supabase: { from: (t: string) => { select: (s: string) => { in: (c: string, v: string[]) => Promise<{ data: { id: string; karma: number }[] | null }> } } },
+  items: Item[],
+): Promise<Item[]> {
+  const ownerIds = Array.from(new Set(items.map((i) => i.owner_id).filter((x): x is string => !!x)));
+  if (ownerIds.length === 0) return items;
+  const { data } = await supabase.from("profiles").select("id, karma").in("id", ownerIds);
+  const map = new Map<string, number>();
+  for (const r of data ?? []) map.set(r.id, r.karma ?? 0);
+  return items.map((i) => ({ ...i, owner_karma: i.owner_id ? map.get(i.owner_id) ?? 0 : 0 }));
 }
 
 // ---------- Items ----------
@@ -24,7 +35,7 @@ export const listItems = createServerFn({ method: "GET" })
       .select("*")
       .order("distance_mi", { ascending: true });
     if (error) throw safeError(error, "Couldn't load items.");
-    return (data ?? []) as Item[];
+    return attachKarma(context.supabase as never, (data ?? []) as Item[]);
   });
 
 const createItemInput = z.object({
@@ -32,6 +43,7 @@ const createItemInput = z.object({
   emoji: z.string().min(1).max(8),
   category: z.string().min(1).max(40),
   availability: z.string().min(1).max(80),
+  trust_circle: z.enum(["building", "block", "neighborhood"]).default("block"),
 });
 
 export const createItem = createServerFn({ method: "POST" })
@@ -57,6 +69,7 @@ export const createItem = createServerFn({ method: "POST" })
       availability: data.availability,
       availability_tags: ["today", "tomorrow", "weekend", "weekday"],
       estimated_value: 100,
+      trust_circle: data.trust_circle,
     };
 
     const { data: row, error } = await context.supabase
@@ -111,7 +124,6 @@ export const approveBorrow = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: unknown) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
-    // Only the item's owner may approve a borrow request.
     const { data: borrow, error: fetchErr } = await context.supabase
       .from("borrows")
       .select("id, item:items(owner_id)")
@@ -137,27 +149,47 @@ export const approveBorrow = createServerFn({ method: "POST" })
 
 export const getImpact = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { data: borrows } = await context.supabase
-      .from("borrows")
-      .select("item:items(estimated_value)");
-    const rows = (borrows ?? []) as Array<{ item: { estimated_value: number } | null }>;
-    const dollarsSaved = rows.reduce((s, r) => s + Number(r.item?.estimated_value ?? 0), 0);
-    const count = rows.length;
-
-    const { count: itemCount } = await context.supabase
+  .handler(async ({ context }): Promise<ImpactStats> => {
+    const { data: items } = await context.supabase
       .from("items")
+      .select("id, trust_circle, borrow_count, co2_kg_per_borrow, estimated_value");
+    const rows = (items ?? []) as Array<{
+      id: string;
+      trust_circle: TrustCircle;
+      borrow_count: number;
+      co2_kg_per_borrow: number;
+      estimated_value: number;
+    }>;
+
+    const { count: borrowCount } = await context.supabase
+      .from("borrows")
       .select("id", { count: "exact", head: true });
 
+    let dollarsSaved = 0;
+    let co2KgSaved = 0;
+    let landfillItemsDiverted = 0;
+    const circleBreakdown = { building: 0, block: 0, neighborhood: 0 };
+
+    for (const r of rows) {
+      const bc = Number(r.borrow_count ?? 0);
+      dollarsSaved += bc * Number(r.estimated_value ?? 0);
+      co2KgSaved += bc * Number(r.co2_kg_per_borrow ?? 8);
+      landfillItemsDiverted += bc;
+      const c = (r.trust_circle ?? "block") as TrustCircle;
+      circleBreakdown[c] = (circleBreakdown[c] ?? 0) + 1;
+    }
+
     return {
-      itemsShared: itemCount ?? 0,
+      itemsShared: rows.length,
       dollarsSaved,
-      thingsNotBought: count,
+      thingsNotBought: borrowCount ?? 0,
+      co2KgSaved,
+      landfillItemsDiverted,
+      circleBreakdown,
     };
   });
 
-
-// ---------- Smart search (AI + rule-based fallback) ----------
+// ---------- Smart search (AI + rule-based fallback + cascade substitutes) ----------
 
 const searchInput = z.object({ query: z.string().max(300) });
 
@@ -194,8 +226,11 @@ export const smartSearch = createServerFn({ method: "POST" })
       };
     }
 
+    let chosenIds: string[] = [];
+    let whenLabel: string | null = null;
+    let summary = "";
 
-    // Try AI first
+    // 1) AI primary match
     try {
       const { chatJSON } = await import("../ai-gateway.server");
       const catalog = items.map((i) => ({
@@ -208,12 +243,8 @@ export const smartSearch = createServerFn({ method: "POST" })
         availability: i.availability,
       }));
 
-      const ai = await chatJSON<{
-        item_ids: string[];
-        when_label: string | null;
-        summary: string;
-      }>({
-        system: `You help neighbors find things to borrow on their block. Given a natural-language request and a catalog of available items, return the IDs of items that match — ranked best first. Match synonyms loosely (e.g. "power washer" = "pressure washer", "drill" matches "cordless drill"). Always return at least 1 id if the catalog has anything plausibly related; if truly nothing relates, return [] and we'll fall back. Also extract the time window (e.g. "this weekend", "tonight", "Saturday") into when_label as a short phrase, or null. Write a warm, confident one-sentence summary like "Found it — Maria has a pressure washer 2 doors down, free this weekend." using the top match.`,
+      const ai = await chatJSON<{ item_ids: string[]; when_label: string | null; summary: string }>({
+        system: `Match a neighbor's natural-language borrow request to items in the catalog. Return ids of items that match (best first). Handle synonyms loosely (power washer = pressure washer, drill = cordless drill). If nothing matches, return []. Extract any time phrase ("this weekend", "tonight") into when_label. Write a warm one-sentence summary using the top match (owner + item + doors_away + availability).`,
         user: `Request: ${JSON.stringify(query)}\n\nCatalog:\n${JSON.stringify(catalog)}`,
         schema: {
           type: "object",
@@ -227,50 +258,93 @@ export const smartSearch = createServerFn({ method: "POST" })
         },
       });
 
-      if (ai && Array.isArray(ai.item_ids) && ai.item_ids.length > 0) {
-        const valid = ai.item_ids.filter((id) => items.some((i) => i.id === id));
-        if (valid.length > 0) {
-          return {
-            itemIds: valid,
-            summary: ai.summary || `Found ${valid.length} match${valid.length === 1 ? "" : "es"}.`,
-            whenLabel: ai.when_label,
-            isFallback: false,
-          };
-        }
+      if (ai && Array.isArray(ai.item_ids)) {
+        chosenIds = ai.item_ids.filter((id) => items.some((i) => i.id === id));
+        whenLabel = ai.when_label ?? null;
+        if (chosenIds.length > 0) summary = ai.summary || "";
       }
     } catch (e) {
       console.warn("AI search failed, falling back:", (e as Error).message);
     }
 
-    // Rule-based fallback — always returns something
-    const q = query.toLowerCase();
-    const tokens = q
-      .replace(/[^a-z0-9 ]/g, " ")
-      .split(/\s+/)
-      .filter((t) => t.length > 2);
+    // 2) Rule-based fallback if AI returned nothing
+    if (chosenIds.length === 0) {
+      const q = query.toLowerCase();
+      const tokens = q
+        .replace(/[^a-z0-9 ]/g, " ")
+        .split(/\s+/)
+        .filter((t) => t.length > 2);
 
-    const scored = items.map((it) => {
-      const hay = [it.name, it.category, ...it.synonyms].join(" ").toLowerCase();
-      let score = 0;
-      for (const t of tokens) if (hay.includes(t)) score += 10;
-      if (hay.includes(q)) score += 30;
-      score -= Number(it.distance_mi) * 2;
-      return { it, score };
-    });
-    scored.sort((a, b) => b.score - a.score);
-    const strong = scored.filter((s) => s.score >= 10);
-    const chosen = (strong.length > 0 ? strong : scored.slice(0, 4)).map((s) => s.it);
-    const top = chosen[0];
-    const isFallback = strong.length === 0;
+      const scored = items.map((it) => {
+        const hay = [it.name, it.category, ...it.synonyms].join(" ").toLowerCase();
+        let score = 0;
+        for (const t of tokens) if (hay.includes(t)) score += 10;
+        if (hay.includes(q)) score += 30;
+        score -= Number(it.distance_mi) * 2;
+        return { it, score };
+      });
+      scored.sort((a, b) => b.score - a.score);
+      const strong = scored.filter((s) => s.score >= 10);
+      if (strong.length > 0) {
+        chosenIds = strong.map((s) => s.it.id);
+        const top = strong[0].it;
+        summary =
+          summary ||
+          `Found it — ${top.owner_display_name} has a ${top.name.toLowerCase()} ${top.doors_away.toLowerCase()}, ${top.availability.toLowerCase()}.`;
+      }
+    }
 
-    const summary = isFallback
-      ? `No exact match — here are the closest things your block has right now.`
-      : `Found it — ${top.owner_display_name} has a ${top.name.toLowerCase()} ${top.doors_away.toLowerCase()}, ${top.availability.toLowerCase()}.`;
+    // 3) Cascade — no direct match? Ask AI for creative substitutes from the catalog.
+    let substitutes: SearchResult["substitutes"] = undefined;
+    let isFallback = false;
+    if (chosenIds.length === 0) {
+      isFallback = true;
+      try {
+        const { chatJSON } = await import("../ai-gateway.server");
+        const catalog = items.map((i) => ({ id: i.id, name: i.name, category: i.category }));
+        const ai = await chatJSON<{ substitutes: { id: string; reason: string }[]; summary: string }>({
+          system: `The neighbor's exact request isn't in the catalog. Suggest up to 3 items from the catalog that could plausibly substitute (e.g. "no pressure washer, but a garden hose nozzle handles light grime"). Each substitute needs a short one-sentence reason starting like "No X, but…". Write a warm summary acknowledging no exact match and pointing to the substitutes.`,
+          user: `Request: ${JSON.stringify(query)}\n\nCatalog:\n${JSON.stringify(catalog)}`,
+          schema: {
+            type: "object",
+            properties: {
+              substitutes: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: { id: { type: "string" }, reason: { type: "string" } },
+                  required: ["id", "reason"],
+                  additionalProperties: false,
+                },
+              },
+              summary: { type: "string" },
+            },
+            required: ["substitutes", "summary"],
+            additionalProperties: false,
+          },
+        });
+        if (ai && Array.isArray(ai.substitutes)) {
+          substitutes = ai.substitutes
+            .filter((s) => items.some((i) => i.id === s.id))
+            .slice(0, 3)
+            .map((s) => ({ itemId: s.id, reason: s.reason }));
+          if (substitutes.length > 0) {
+            chosenIds = substitutes.map((s) => s.itemId);
+            summary = ai.summary || `No exact match — here are some creative swaps from your block.`;
+          }
+        }
+      } catch (e) {
+        console.warn("Cascade AI failed:", (e as Error).message);
+      }
 
-    return {
-      itemIds: chosen.map((i) => i.id),
-      summary,
-      whenLabel: null,
-      isFallback,
-    };
+      if (chosenIds.length === 0) {
+        chosenIds = items.slice(0, 4).map((i) => i.id);
+        summary = `No exact match — here are the closest things your block has right now.`;
+      }
+    }
+
+    const withKarma = await attachKarma(context.supabase as never, items);
+    void withKarma; // karma is fetched via listItems for the cards; search only returns ids
+
+    return { itemIds: chosenIds, summary, whenLabel, isFallback, substitutes };
   });

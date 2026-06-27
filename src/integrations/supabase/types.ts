@@ -56,7 +56,9 @@ export type Database = {
         Row: {
           availability: string
           availability_tags: string[]
+          borrow_count: number
           category: string
+          co2_kg_per_borrow: number
           created_at: string
           distance_mi: number
           doors_away: string
@@ -68,11 +70,14 @@ export type Database = {
           owner_display_name: string
           owner_id: string | null
           synonyms: string[]
+          trust_circle: string
         }
         Insert: {
           availability?: string
           availability_tags?: string[]
+          borrow_count?: number
           category?: string
+          co2_kg_per_borrow?: number
           created_at?: string
           distance_mi?: number
           doors_away?: string
@@ -84,11 +89,14 @@ export type Database = {
           owner_display_name: string
           owner_id?: string | null
           synonyms?: string[]
+          trust_circle?: string
         }
         Update: {
           availability?: string
           availability_tags?: string[]
+          borrow_count?: number
           category?: string
+          co2_kg_per_borrow?: number
           created_at?: string
           distance_mi?: number
           doors_away?: string
@@ -100,6 +108,7 @@ export type Database = {
           owner_display_name?: string
           owner_id?: string | null
           synonyms?: string[]
+          trust_circle?: string
         }
         Relationships: []
       }
@@ -111,6 +120,8 @@ export type Database = {
           distance_mi: number
           doors_away: string
           id: string
+          karma: number
+          trust_circle: string
         }
         Insert: {
           avatar_color?: string
@@ -119,6 +130,8 @@ export type Database = {
           distance_mi?: number
           doors_away?: string
           id: string
+          karma?: number
+          trust_circle?: string
         }
         Update: {
           avatar_color?: string
@@ -127,6 +140,8 @@ export type Database = {
           distance_mi?: number
           doors_away?: string
           id?: string
+          karma?: number
+          trust_circle?: string
         }
         Relationships: []
       }

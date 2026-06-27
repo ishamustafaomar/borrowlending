@@ -25,7 +25,9 @@ export function Header({ onLend }: { onLend: () => void }) {
           <h1 className="font-display text-2xl font-black leading-none tracking-tight text-primary">
             Borrow
           </h1>
-          <p className="mt-1 text-xs text-muted-foreground">Your block already owns it.</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            The circular economy for future cities.
+          </p>
         </div>
       </div>
       <div className="flex items-center gap-2">
