@@ -2,11 +2,13 @@
 // Everything lives in localStorage — no auth, no cloud.
 
 import type { Item, BorrowRow, SearchResult, ImpactStats, TrustCircle } from "./types";
+import { buildMockItems } from "./seed-mock";
 
 const KEYS = {
   profile: "borrow:profile",
   items: "borrow:items",
   borrows: "borrow:borrows",
+  seeded: "borrow:seeded-v2",
 };
 
 export type Profile = {
