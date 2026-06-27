@@ -55,7 +55,28 @@ function AuthPage() {
     }
   };
 
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
+      <div className="w-full max-w-md">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[var(--shadow-soft)]">
+            <Sprout className="h-7 w-7" />
+          </div>
+          <div>
+            <h1 className="font-display text-3xl font-black text-primary">Borrow</h1>
+            <p className="text-sm text-muted-foreground">Your block already owns it.</p>
+          </div>
+        </div>
 
+        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
+          <h2 className="font-display text-2xl font-bold mb-1">
+            {mode === "signin" ? "Welcome back" : "Join the block"}
+          </h2>
+          <p className="text-sm text-muted-foreground mb-5">
+            {mode === "signin"
+              ? "Sign in to see what your neighbors are lending."
+              : "Create an account to borrow and lend with your neighbors."}
+          </p>
 
 
           <form onSubmit={submit} className="grid gap-3">
