@@ -65,7 +65,19 @@ export function pickAvatarColor(seed: string): string {
 
 // ---------- Items ----------
 
+function ensureSeeded() {
+  if (!isBrowser()) return;
+  if (localStorage.getItem(KEYS.seeded) === "1") return;
+  const existing = read<Item[]>(KEYS.items, []);
+  // Merge: keep any user-added items, drop stale seed rows, then re-seed.
+  const userItems = existing.filter((i) => !i.id.startsWith("seed-"));
+  const merged = [...buildMockItems(), ...userItems];
+  localStorage.setItem(KEYS.items, JSON.stringify(merged));
+  localStorage.setItem(KEYS.seeded, "1");
+}
+
 export function listItemsLocal(): Item[] {
+  ensureSeeded();
   const items = read<Item[]>(KEYS.items, []);
   return [...items].sort((a, b) => a.distance_mi - b.distance_mi);
 }
