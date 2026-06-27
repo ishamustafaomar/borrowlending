@@ -1,4 +1,4 @@
-// Lightweight Lovable AI Gateway client (no AI SDK dependency for this small use case)
+// Lightweight AI gateway client
 const BASE_URL = "https://ai.gateway.lovable.dev/v1";
 
 type ChatMessage = { role: "system" | "user" | "assistant"; content: string };
