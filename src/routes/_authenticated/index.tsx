@@ -130,6 +130,7 @@ function Home() {
         onOpenChange={(v) => !v && setAskItem(null)}
       />
       <LendItemSheet open={lendOpen} onOpenChange={setLendOpen} />
+      <SeasonalMascot />
     </div>
   );
 }
