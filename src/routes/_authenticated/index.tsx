@@ -9,16 +9,16 @@ import { BorrowRequestDialog } from "@/components/borrow/BorrowRequestDialog";
 import { LendItemSheet } from "@/components/borrow/LendItemSheet";
 import { MyBorrowsList } from "@/components/borrow/MyBorrowsList";
 import type { Item } from "@/lib/borrow/types";
-import { Sparkles, Loader2 } from "lucide-react";
+import { Sparkles, Loader2, Lightbulb } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/")({
   head: () => ({
     meta: [
-      { title: "Borrow — your block already owns it" },
+      { title: "Borrow — the circular economy for future cities" },
       {
         name: "description",
         content:
-          "Borrow tools, gear, and appliances from neighbors. Smart conversational search finds what you need on your block in seconds.",
+          "Borrow tools, gear, and appliances from neighbors. Conversational search, trust circles, and karma make sharing on your block effortless.",
       },
     ],
   }),
@@ -44,11 +44,19 @@ function Home() {
     return search.itemIds.map((id) => itemsById.get(id)).filter((x): x is Item => !!x);
   }, [search, items, itemsById]);
 
+  const substituteMap = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of search?.substitutes ?? []) m.set(s.itemId, s.reason);
+    return m;
+  }, [search]);
+
   const summary =
     search?.summary ??
     (items.length === 0
       ? "Nothing on the block yet — be the first to lend something."
       : `${items.length} thing${items.length === 1 ? "" : "s"} your block is happy to lend right now.`);
+
+  const isCascade = (search?.substitutes?.length ?? 0) > 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -60,9 +68,17 @@ function Home() {
           <SmartSearch value={query} onChange={setQuery} />
         </div>
 
-        <div className="flex items-start gap-2 rounded-2xl bg-accent/60 px-4 py-3 text-sm text-primary">
+        <div
+          className={`flex items-start gap-2 rounded-2xl px-4 py-3 text-sm transition-colors ${
+            isCascade
+              ? "bg-coral/10 text-coral"
+              : "bg-accent/60 text-primary"
+          }`}
+        >
           {searching ? (
             <Loader2 className="mt-0.5 h-4 w-4 shrink-0 animate-spin text-coral" />
+          ) : isCascade ? (
+            <Lightbulb className="mt-0.5 h-4 w-4 shrink-0" />
           ) : (
             <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-coral" />
           )}
@@ -88,12 +104,16 @@ function Home() {
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {ranked.map((it) => (
-                <ItemCard key={it.id} item={it} onAsk={setAskItem} />
+                <ItemCard
+                  key={it.id}
+                  item={it}
+                  onAsk={setAskItem}
+                  cascadeReason={substituteMap.get(it.id)}
+                />
               ))}
             </div>
           )}
         </section>
-
 
         <MyBorrowsList />
 
