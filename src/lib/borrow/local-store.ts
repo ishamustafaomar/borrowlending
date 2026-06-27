@@ -356,6 +356,7 @@ export function resetAllLocal() {
   if (!isBrowser()) return;
   localStorage.removeItem(KEYS.items);
   localStorage.removeItem(KEYS.borrows);
+  localStorage.removeItem(KEYS.seeded);
   window.dispatchEvent(new CustomEvent("borrow:store-change", { detail: { key: "all" } }));
 }
 
