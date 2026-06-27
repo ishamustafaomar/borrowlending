@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable/index";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -55,54 +55,8 @@ function AuthPage() {
     }
   };
 
-  const google = async () => {
-    const result = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (result.error) {
-      toast.error(result.error.message ?? "Google sign-in failed");
-      return;
-    }
-    if (result.redirected) return;
-    navigate({ to: "/", replace: true });
-  };
 
-  return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-8">
-      <div className="w-full max-w-md">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-[var(--shadow-soft)]">
-            <Sprout className="h-7 w-7" />
-          </div>
-          <div>
-            <h1 className="font-display text-3xl font-black text-primary">Borrow</h1>
-            <p className="text-sm text-muted-foreground">Your block already owns it.</p>
-          </div>
-        </div>
 
-        <div className="rounded-3xl border border-border bg-card p-6 shadow-[var(--shadow-card)]">
-          <h2 className="font-display text-2xl font-bold mb-1">
-            {mode === "signin" ? "Welcome back" : "Join the block"}
-          </h2>
-          <p className="text-sm text-muted-foreground mb-5">
-            {mode === "signin"
-              ? "Sign in to see what your neighbors are lending."
-              : "Create an account to borrow and lend with your neighbors."}
-          </p>
-
-          <Button
-            type="button"
-            onClick={google}
-            variant="outline"
-            className="w-full rounded-full mb-4"
-          >
-            Continue with Google
-          </Button>
-
-          <div className="relative my-4">
-            <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-border" /></div>
-            <div className="relative flex justify-center text-xs"><span className="bg-card px-2 text-muted-foreground">or email</span></div>
-          </div>
 
           <form onSubmit={submit} className="grid gap-3">
             {mode === "signup" && (
