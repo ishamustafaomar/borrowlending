@@ -60,6 +60,7 @@ export function useCreateItem() {
       emoji: string;
       category: string;
       availability: string;
+      trust_circle: "building" | "block" | "neighborhood";
     }) => fn({ data: input }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["items"] });
